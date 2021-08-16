@@ -22,6 +22,9 @@ USERAGENTS = (
 )
 USERAGENT_INSTA = "Instagram 123.0.0.21.114 (iPhone; CPU iPhone OS 11_4 like Mac OS X; en_US; en-US; scale=2.00; 750x1334) AppleWebKit/605.1.15"
 
+def urlshortner(url):
+    return requests.get("http://tinyurl.com/api-create.php?url=" + url).text
+
 #==================================================
 
 #AUTHENTICATION
@@ -183,7 +186,7 @@ def user_info(username):
     info["username"] = user_results["username"]
     info["name"] = user_results["full_name"]
 
-    info["profile_img_url"] = user_results["profile_pic_url_hd"]
+    info["profile_img_url"] = urlshortner(user_results["profile_pic_url_hd"])
     info["biography"] = user_results["biography"].replace("\n", " . ")
     info["external_url"] = user_results["external_url"]
 
@@ -254,7 +257,7 @@ def post_info(username, i):
         info["sep "+str(iimage)] = "IMAGE "+str(iimage)
 
         info[iimage_str+"id"] = post_image_results["id"]
-        info[iimage_str+"image_url"] = post_image_results["display_url"]
+        info[iimage_str+"image_url"] = urlshortner(post_image_results["display_url"])
         info[iimage_str+"accessibility"] = post_image_results["accessibility_caption"]
 
         info[iimage_str+"type"] = "video" if post_image_results["is_video"] else "image"
