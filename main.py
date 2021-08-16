@@ -335,6 +335,38 @@ def followerings_usernames(username, f, toget):
 
 #==================================================
 
+#COMPARE USERNAMES
+
+def cmp_usernames(f1, f2):
+    with f1:
+        with f2:
+            _, mode1, t1 = f1.readline().split("|")
+            _, mode2, t2 = f2.readline().split("|")
+
+            usernames1 = set(f1.read().splitlines())
+            usernames2 = set(f2.read().splitlines())
+
+            usernames1_notin_2 = usernames1.difference(usernames2)
+            usernames2_notin_1 = usernames2.difference(usernames1)
+
+            if mode1 == mode2:
+                if t2 < t1:
+                    usernames1_notin_2, usernames2_notin_1 \
+                        = usernames2_notin_1, usernames1_notin_2
+
+                print("Old {m}\t->\n".format(m=mode1)+str(usernames1_notin_2)+"\n")
+                print("New {m}\t->\n".format(m=mode1)+str(usernames2_notin_1)+"\n")
+
+            else:
+                if mode2 == "followers":
+                    usernames1_notin_2, usernames2_notin_1 \
+                        = usernames2_notin_1, usernames1_notin_2
+
+                print("Followers not following\t->\n"+str(usernames1_notin_2)+"\n")
+                print("Following not followers\t->\n"+str(usernames2_notin_1)+"\n")
+
+#==================================================
+
 def args_control():
 
     ap = argparse.ArgumentParser(
@@ -381,6 +413,14 @@ def args_control():
         type=argparse.FileType("w")
     )
 
+    ap.add_argument(
+        "-c", "--cmp",
+        help="Compare two user lists created by the -f1 or -f2 options",
+        metavar=("infile1", "infile2"),
+        type=argparse.FileType("r"),
+        nargs=2
+    )
+
     if len(sys.argv) <= 1:
         ap.print_help()
         exit()
@@ -422,6 +462,9 @@ if __name__ == "__main__":
         if only_user_info:
             user_info_data = user_info(args["user"])
             dictprint(user_info_data)
+
+    if args["cmp"] is not None:
+        cmp_usernames(*args["cmp"])
 
     if authenticate_user.isLogin():
         authenticate_user.logout()
