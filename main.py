@@ -11,6 +11,18 @@ URL_LOGIN = URL_BASE+"accounts/login/ajax/"
 URL_LOGOUT = URL_BASE+"accounts/logout/"
 
 URL_USER = URL_BASE+"{username}/?__a=1"
+URL_QUERY = URL_BASE+"graphql/query/?query_hash={hash}&variables={params}"
+
+TOGET_FOLLOWERS = {
+    "str": "followers",
+    "hash": "5aefa9893005572d237da5068082d8d5",
+    "edge_path": "edge_followed_by"
+}
+TOGET_FOLLOWINGS = {
+    "str": "followings",
+    "hash": "c56ee0ae1f89cdbd1c89e2bc6b8f3d18",
+    "edge_path": "edge_follow"
+}
 
 USERAGENTS = (
     "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.99 Safari/537.36",
@@ -277,6 +289,52 @@ def posts_info(username):
 
 #==================================================
 
+#GET FOLLOWERS/FOLLOWINGS USERNAMES
+
+def query_followerings(userid, toget, end_cursor):
+    params = '{{"id":"{id}","first":50,"after":"{end}"}}'.format(id=userid, end=end_cursor)
+    response = get_json(URL_QUERY.format(hash=toget["hash"], params=params))
+
+    if response is None:
+        return None, None
+
+    followings_data = json.loads(response)["data"]["user"][toget["edge_path"]]
+
+    if not followings_data:
+        return None, None
+
+    followings = [node["node"]["username"] for node in followings_data["edges"]]
+    end_cursor = followings_data["page_info"]["end_cursor"]
+    return followings, end_cursor
+
+
+def followerings_gen(username, toget, end_cursor=""):
+    userid = user_info(username)["id"]
+
+    if userid is None:
+        return
+
+    while True:
+        followerings, end_cursor = query_followerings(userid, toget, end_cursor)
+
+        if not followerings:
+            return
+
+        for followering in followerings:
+            yield followering
+
+        if not end_cursor:
+            return
+
+def followerings_usernames(username, f, toget):
+    with f:
+        f.write(username + "|"+toget["str"]+"|" + str(int(time.time())) + "\n")
+        for following in followerings_gen(username, toget):
+            f.write(following + "\n")
+            f.flush()
+
+#==================================================
+
 def args_control():
 
     ap = argparse.ArgumentParser(
@@ -309,6 +367,20 @@ def args_control():
         const=-1
     )
 
+    ap.add_argument(
+        "-f1", "--get_followings",
+        help="Usernames of the user's followings",
+        metavar="outfile",
+        type=argparse.FileType("w")
+    )
+
+    ap.add_argument(
+        "-f2", "--get_followers",
+        help="Usernames of the user's followers",
+        metavar="outfile",
+        type=argparse.FileType("w")
+    )
+
     if len(sys.argv) <= 1:
         ap.print_help()
         exit()
@@ -337,6 +409,14 @@ if __name__ == "__main__":
             else:
                 post_info_data = post_info(args["user"], args["post"])
                 dictprint(post_info_data)
+            only_user_info = False
+
+        if args["get_followings"] is not None:
+            followerings_usernames(args["user"], args["get_followings"], TOGET_FOLLOWERS)
+            only_user_info = False
+
+        if args["get_followers"] is not None:
+            followerings_usernames(args["user"], args["get_followers"], TOGET_FOLLOWINGS)
             only_user_info = False
 
         if only_user_info:
