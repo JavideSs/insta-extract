@@ -208,6 +208,72 @@ def user_info(username):
 
 #==================================================
 
+#GET POST INFO
+
+def post_info(username, i):
+    if i>12:
+        return
+
+    response = get_json(URL_USER.format(username=username))
+
+    if response is None:
+        return
+
+    results = json.loads(response)
+    post_results = results["graphql"]["user"]["edge_owner_to_timeline_media"]["edges"][i]["node"]
+
+    info = OrderedDict()
+    info["sep"] = "POST INFO "+str(i)
+
+    info["timestamp"] = post_results["taken_at_timestamp"]
+    info["date"] = datetime.datetime.fromtimestamp(post_results["taken_at_timestamp"])
+    info["nlikes"] = post_results["edge_liked_by"]["count"]
+    info["comments_disabled"] = post_results["comments_disabled"]
+    info["ncomments"] = post_results["edge_media_to_comment"]["count"]
+
+    location = post_results["location"]
+    info["location"] = location["name"]+" (id: "+location["id"]+")" \
+        if location is not None \
+        else location
+
+    caption = post_results["edge_media_to_caption"]["edges"]
+    if caption != []:
+        info["caption"] = caption[0]["node"]["text"].replace("\n", " . ")
+
+    total_imgs = len(post_results["edge_sidecar_to_children"]["edges"]) \
+        if "edge_sidecar_to_children" in post_results \
+        else 1
+
+    for iimage in range(total_imgs):
+        iimage_str = "("+str(iimage)+")"
+
+        post_image_results = post_results["edge_sidecar_to_children"]["edges"][iimage]["node"] \
+            if total_imgs != 1 \
+            else post_results
+
+        info["sep "+str(iimage)] = "IMAGE "+str(iimage)
+
+        info[iimage_str+"id"] = post_image_results["id"]
+        info[iimage_str+"image_url"] = post_image_results["display_url"]
+        info[iimage_str+"accessibility"] = post_image_results["accessibility_caption"]
+
+        info[iimage_str+"type"] = "video" if post_image_results["is_video"] else "image"
+        info[iimage_str+"typename"] = post_image_results["__typename"]
+        info[iimage_str+"dimensions"] = "{width}x{height}".format(
+            width=post_image_results["dimensions"]["width"],
+            height=post_image_results["dimensions"]["height"]
+        )
+
+    return info
+
+
+def posts_info(username):
+    nimgs = min(user_info(username)["nimgs"], 12)
+    for i in range(nimgs):
+        yield post_info(username, i)
+
+#==================================================
+
 def args_control():
 
     ap = argparse.ArgumentParser(
@@ -230,6 +296,16 @@ def args_control():
         nargs=2
     )
 
+    ap.add_argument(
+        "-p", "--post",
+        help="""Info of all post if not arguments,
+            else info of the post at index (counting from the last post as 0)""",
+        metavar="n",
+        type=int,
+        nargs="?",
+        const=-1
+    )
+
     if len(sys.argv) <= 1:
         ap.print_help()
         exit()
@@ -248,8 +324,21 @@ if __name__ == "__main__":
         authenticate_user.login(*args["login"])
 
     if args["user"] is not None:
-        user_info_data = user_info(args["user"])
-        dictprint(user_info_data)
+        only_user_info = True
+
+        if args["post"] is not None:
+            if args["post"] == -1:
+                posts_info_data = posts_info(args["user"])
+                for i, post_info_data in enumerate(posts_info_data):
+                    dictprint(post_info_data)
+            else:
+                post_info_data = post_info(args["user"], args["post"])
+                dictprint(post_info_data)
+            only_user_info = False
+
+        if only_user_info:
+            user_info_data = user_info(args["user"])
+            dictprint(user_info_data)
 
     if authenticate_user.isLogin():
         authenticate_user.logout()
