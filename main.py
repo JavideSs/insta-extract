@@ -1,13 +1,88 @@
 import argparse, sys, os
 from collections import OrderedDict
-import time, json
+import time, datetime, random, pickle, json, re
 import requests
 
 #CONSTANTS
 
 URL_BASE = "https://www.instagram.com/"
 
+URL_LOGIN = URL_BASE+"accounts/login/ajax/"
+URL_LOGOUT = URL_BASE+"accounts/logout/"
+
 URL_USER = URL_BASE+"{username}/?__a=1"
+
+USERAGENTS = (
+    "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.99 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.87 Safari/537.36"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.79 Safari/537.36 Edge/14.14393",
+    "Mozilla/5.0 (Linux; U; Android-4.0.3; en-us; Galaxy Nexus Build/IML74K) AppleWebKit/535.7 (KHTML, like Gecko) CrMo/16.0.912.75 Mobile Safari/535.7",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_1) AppleWebKit/602.2.14 (KHTML, like Gecko) Version/10.0.1 Safari/602.2.14",
+    "Mozilla/5.0 (iPad; CPU OS 8_4_1 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Version/8.0 Mobile/12H321 Safari/600.1.4",
+)
+USERAGENT_INSTA = "Instagram 123.0.0.21.114 (iPhone; CPU iPhone OS 11_4 like Mac OS X; en_US; en-US; scale=2.00; 750x1334) AppleWebKit/605.1.15"
+
+#==================================================
+
+#AUTHENTICATION
+
+class User:
+    def __init__(self):
+        self.session = requests.Session()
+
+    def isLogin(self):
+        return False
+
+    def loadCookies(self, fpath):
+        with open(fpath, "rb") as f:
+            self.session.cookies.update(pickle.load(f))
+
+    def saveCookies(self, fpath):
+        with open(fpath, "wb") as f:
+            pickle.dump(self.session.cookies, f)
+
+
+class AuthenticateUser(User):
+    def __init__(self):
+        super().__init__()
+        self.session.headers = {
+            "Referer": URL_BASE,
+            "user-agent": USERAGENT_INSTA
+        }
+        response = self.session.get(
+            URL_BASE
+        )
+        self.session.headers.update({
+            "X-CSRFToken": response.cookies["csrftoken"]
+        })
+
+        self.login_session = None
+
+    def isLogin(self):
+        return self.login_session is not None \
+            and json.loads(self.login_session.text).get("authenticated") \
+            and self.login_session.status_code == 200
+
+    def login(self, username, password):
+        self.login_session = self.session.post(
+            url=URL_LOGIN,
+            data={"username":username, "password":password},
+            allow_redirects=True
+        )
+
+        if self.isLogin():
+            self.session.headers.update({
+                "user-agent": random.choice(USERAGENTS)
+            })
+        else:
+            print("Error while login:\n", json.loads(self.login_session.text))
+
+    def logout(self):
+        if self.isLogin():
+            self.session.post(
+                url=URL_LOGOUT,
+                data={"csrfmiddlewaretoken": self.login_session.cookies["csrftoken"]}
+            )
 
 #==================================================
 
@@ -60,7 +135,12 @@ def dictprint(d):
 
 def safe_get(nretry, *args, **kwargs):
     try:
-        response = requests.get(*args, **kwargs)
+        response = authenticate_user.session.get(
+            timeout=90,
+            cookies=authenticate_user.login_session.cookies,
+            *args, **kwargs
+        )   if authenticate_user.isLogin() \
+            else requests.get(*args, **kwargs)
 
         response.raise_for_status()
 
@@ -142,6 +222,14 @@ def args_control():
         type=str
     )
 
+    ap.add_argument(
+        "-l", "--login",
+        help="Login username and password required for some options",
+        metavar=("username", "password"),
+        type=str,
+        nargs=2
+    )
+
     if len(sys.argv) <= 1:
         ap.print_help()
         exit()
@@ -154,6 +242,14 @@ if __name__ == "__main__":
 
     bannerprint()
 
+    authenticate_user = User()
+    if args["login"] is not None:
+        authenticate_user = AuthenticateUser()
+        authenticate_user.login(*args["login"])
+
     if args["user"] is not None:
         user_info_data = user_info(args["user"])
         dictprint(user_info_data)
+
+    if authenticate_user.isLogin():
+        authenticate_user.logout()
