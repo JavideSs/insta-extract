@@ -178,13 +178,34 @@ def safe_get(nretry, *args, **kwargs):
 
 def get_json(*args, **kwargs):
     response = safe_get(3, *args, **kwargs)
-    return response.text if response is not None else None
+    return response.text if response.ok else None
+
+
+def download_webimg(url):
+    response = requests.get(
+        url,
+        allow_redirects=True,
+        stream=True
+    )
+
+    if not response.ok:
+        print("Error while downloading post")
+        return
+
+    re_f_name = re.search("[a-zA-Z0-9_]+.jpg", url)
+    f_name = re_f_name.group(0) if re_f_name is not None else "image.jpg"
+
+    with open(f_name, "wb") as f:
+        for block in response.iter_content(1024):
+            if not block:
+                break
+            f.write(block)
 
 #==================================================
 
 #GET USER INFO
 
-def user_info(username):
+def user_info(username, to_download=False):
     response = get_json(URL_USER.format(username=username))
 
     if response is None:
@@ -201,6 +222,9 @@ def user_info(username):
     info["name"] = user_results["full_name"]
 
     info["profile_img_url"] = urlshortner(user_results["profile_pic_url_hd"])
+    if to_download:
+        download_webimg(user_results["profile_pic_url_hd"])
+
     info["biography"] = user_results["biography"].replace("\n", " . ")
     info["external_url"] = user_results["external_url"]
 
@@ -242,7 +266,7 @@ def user_info(username):
 
 #GET POST INFO
 
-def post_info(username, i):
+def post_info(username, i, to_download):
     if i>12:
         return
 
@@ -285,8 +309,11 @@ def post_info(username, i):
 
         info["sep "+str(iimage)] = "IMAGE "+str(iimage)
 
-        info[iimage_str+"id"] = post_image_results["id"]
         info[iimage_str+"image_url"] = urlshortner(post_image_results["display_url"])
+        if to_download:
+            download_webimg(post_image_results["display_url"])
+
+        info[iimage_str+"id"] = post_image_results["id"]
         info[iimage_str+"accessibility"] = post_image_results["accessibility_caption"]
 
         info[iimage_str+"type"] = "video" if post_image_results["is_video"] else "image"
@@ -299,10 +326,10 @@ def post_info(username, i):
     return info
 
 
-def posts_info(username):
+def posts_info(username, to_download):
     nimgs = min(user_info(username)["nimgs"], 12)
     for i in range(nimgs):
-        yield post_info(username, i)
+        yield post_info(username, i, to_download)
 
 #==================================================
 
@@ -417,6 +444,12 @@ def args_control():
     )
 
     ap.add_argument(
+        "-dp", "--download_posts",
+        help="Download posts found by the other options",
+        action="store_true"
+    )
+
+    ap.add_argument(
         "-f1", "--get_followings",
         help="Usernames of the user's followings",
         metavar="outfile",
@@ -460,11 +493,11 @@ if __name__ == "__main__":
 
         if args["post"] is not None:
             if args["post"] == -1:
-                posts_info_data = posts_info(args["user"])
+                posts_info_data = posts_info(args["user"], args["download_posts"])
                 for i, post_info_data in enumerate(posts_info_data):
                     dictprint(post_info_data)
             else:
-                post_info_data = post_info(args["user"], args["post"])
+                post_info_data = post_info(args["user"], args["post"], args["download_posts"])
                 dictprint(post_info_data)
             only_user_info = False
 
@@ -477,7 +510,7 @@ if __name__ == "__main__":
             only_user_info = False
 
         if only_user_info:
-            user_info_data = user_info(args["user"])
+            user_info_data = user_info(args["user"], args["download_posts"])
             dictprint(user_info_data)
 
     if args["cmp"] is not None:
