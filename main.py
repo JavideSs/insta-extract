@@ -1,5 +1,5 @@
 import argparse, sys, os
-from collections import OrderedDict
+from collections import OrderedDict, Counter
 import time, datetime, random, pickle, json, re
 import requests
 
@@ -140,6 +140,8 @@ def dictprint(d):
         if k.startswith("sep"):
             print(f"\n{CYAN}[+]", v, f"{RESET}\n")
             continue
+        if isinstance(v, (list, tuple, set)):
+            v = ", ".join(v)
         print(f"{BLUE}{k}: {RESET}{v}")
         sys.stdout.flush()
     print("\n=============================================================")
@@ -218,6 +220,21 @@ def user_info(username):
         info["business_email"] = user_results["business_email"]
         info["business_phone_number"] = user_results["business_phone_number"]
         info["business_category_name"] = user_results["business_category_name"]
+
+    func_list_sorted_by_counter = lambda l: next(zip(*sorted(Counter(l).items(), reverse=True, key=lambda v: v[1])))
+
+    user_tags = re.findall(r"[＃#]([_a-zA-Z0-9\.\+-]+)", response)
+    if user_tags != []:
+        info["most_used_tags"] = func_list_sorted_by_counter(user_tags)[:5]
+
+    user_mentions = re.findall(r"[＠@]([_a-zA-Z0-9\.\+-]+)", response)
+    user_mentions = [mention for mention in user_mentions if mention != username]
+    if user_mentions != []:
+        info["most_used_mentions"] = func_list_sorted_by_counter(user_mentions)[:5]
+
+    user_emails = re.findall(r"[_a-zA-Z0-9-\.]+[＠@][a-zA-Z0-9]+\.[a-zA-Z0-9]+", response)
+    if user_emails != []:
+        info["emails_found"] = user_emails
 
     return info
 
