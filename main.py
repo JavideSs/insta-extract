@@ -178,7 +178,7 @@ def safe_get(nretry, *args, **kwargs):
 
 def get_json(*args, **kwargs):
     response = safe_get(3, *args, **kwargs)
-    return response.text if response.ok else None
+    return response.text if response is not None and response.ok else None
 
 
 def download_webimg(url):
@@ -434,6 +434,13 @@ def args_control():
     )
 
     ap.add_argument(
+        "-i", "--info",
+        help="""User profile info,
+            option not necessary if no other option is used to extract user info""",
+        action="store_true"
+    )
+
+    ap.add_argument(
         "-p", "--post",
         help="""Info of all post if not arguments,
             else info of the post at index (counting from the last post as 0)""",
@@ -509,7 +516,7 @@ if __name__ == "__main__":
             followerings_usernames(args["user"], args["get_followers"], TOGET_FOLLOWINGS)
             only_user_info = False
 
-        if only_user_info:
+        if only_user_info or args["info"] is not None:
             user_info_data = user_info(args["user"], args["download_posts"])
             dictprint(user_info_data)
 
