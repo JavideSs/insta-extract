@@ -401,11 +401,15 @@ def followerings_usernames(username, f, toget):
 def cmp_usernames(f1, f2):
     with f1:
         with f2:
-            _, mode1, t1 = f1.readline().split("|")
-            _, mode2, t2 = f2.readline().split("|")
+            try:
+                _, mode1, t1 = f1.readline().split("|")
+                _, mode2, t2 = f2.readline().split("|")
 
-            usernames1 = set(f1.read().splitlines())
-            usernames2 = set(f2.read().splitlines())
+                usernames1 = set(f1.read().splitlines())
+                usernames2 = set(f2.read().splitlines())
+            except:
+                print("Error while comparing usernames")
+                return
 
             usernames1_notin_2 = usernames1.difference(usernames2)
             usernames2_notin_1 = usernames2.difference(usernames1)
