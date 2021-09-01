@@ -121,15 +121,19 @@ if not supports_color():
     BLUE = MAGENTA = CYAN = RESET = ""
 
 
+def printsep():
+    print("\n" + "="*61)
+
+
 def bannerprint():
     print(f"{MAGENTA}\
  ___           _                    _                  _        \n\
 |_ _|_ __  ___| |_ __ _    _____  _| |_ _ __ __ _  ___| |_      \n\
 | || '_ \/ __| __/ _` |  / _ \ \/ / __| '__/ _` |/ __| __|      \n\
 | || | | \__ \ || (_| | |  __/>  <| |_| | | (_| | (__| |_  :p   \n\
-|__|_| |_|___/\__\__,_|  \___/_/\_\___|_|  \__,_|\___|\__|      \n\
+|__|_| |_|___/\__\__,_|  \___/_/\_\___|_|  \__,_|\___|\__|      \
 {RESET}")
-    print("=============================================================")
+    printsep()
 
 
 def dictprint(d):
@@ -138,13 +142,26 @@ def dictprint(d):
 
     for k, v in d.items():
         if k.startswith("sep"):
-            print(f"\n{CYAN}[+]", v, f"{RESET}\n")
+            print(f"\n{CYAN}[+]{v}{RESET}\n")
             continue
         if isinstance(v, (list, tuple, set)):
             v = ", ".join(v)
         print(f"{BLUE}{k}: {RESET}{v}")
         sys.stdout.flush()
-    print("\n=============================================================")
+    printsep()
+
+
+def listprint(l, title):
+    if l is None:
+        return
+
+    print(f"\n{CYAN}{title}{RESET}\n")
+    if not len(l):
+        print("-")
+    else:
+        for v in l:
+            print(v, end=", ")
+    print()
 
 #==================================================
 
@@ -398,16 +415,18 @@ def cmp_usernames(f1, f2):
                     usernames1_notin_2, usernames2_notin_1 \
                         = usernames2_notin_1, usernames1_notin_2
 
-                print("Old {m}\t->\n".format(m=mode1)+str(usernames1_notin_2)+"\n")
-                print("New {m}\t->\n".format(m=mode1)+str(usernames2_notin_1)+"\n")
+                listprint(usernames1_notin_2, mode1 + " who are no longer")
+                listprint(usernames2_notin_1, mode1 + " who were not longer")
+                printsep()
 
             else:
                 if mode2 == "followers":
                     usernames1_notin_2, usernames2_notin_1 \
                         = usernames2_notin_1, usernames1_notin_2
 
-                print("Followers not following\t->\n"+str(usernames1_notin_2)+"\n")
-                print("Following not followers\t->\n"+str(usernames2_notin_1)+"\n")
+                listprint(usernames1_notin_2, "FOLLOWERS NOT FOLLOWINGS")
+                listprint(usernames2_notin_1, "FOLLOWINGS NOT FOLLOWERS")
+                printsep()
 
 #==================================================
 
