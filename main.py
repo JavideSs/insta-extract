@@ -265,16 +265,16 @@ def user_info(username, to_download=False):
     func_list_sorted_by_counter = lambda l: next(zip(*sorted(Counter(l).items(), reverse=True, key=lambda v: v[1])))
 
     user_tags = re.findall(r"[＃#]([_a-zA-Z0-9\.\+-]+)", response)
-    if user_tags != []:
+    if len(user_tags):
         info["most_used_tags"] = func_list_sorted_by_counter(user_tags)[:5]
 
     user_mentions = re.findall(r"[＠@]([_a-zA-Z0-9\.\+-]+)", response)
     user_mentions = [mention for mention in user_mentions if mention != username]
-    if user_mentions != []:
+    if len(user_mentions):
         info["most_used_mentions"] = func_list_sorted_by_counter(user_mentions)[:5]
 
     user_emails = re.findall(r"[_a-zA-Z0-9-\.]+[＠@][a-zA-Z0-9]+\.[a-zA-Z0-9]+", response)
-    if user_emails != []:
+    if len(user_emails):
         info["emails_found"] = user_emails
 
     return info
@@ -310,7 +310,7 @@ def post_info(username, i, to_download):
         else location
 
     caption = post_results["edge_media_to_caption"]["edges"]
-    if caption != []:
+    if len(caption):
         info["caption"] = caption[0]["node"]["text"].replace("\n", " . ")
 
     total_imgs = len(post_results["edge_sidecar_to_children"]["edges"]) \
@@ -539,7 +539,7 @@ if __name__ == "__main__":
             followerings_usernames(args["user"], args["get_followers"], TOGET_FOLLOWINGS)
             only_user_info = False
 
-        if only_user_info or args["info"] is not None:
+        if only_user_info or args["info"]:
             user_info_data = user_info(args["user"], args["download_posts"])
             dictprint(user_info_data)
 
