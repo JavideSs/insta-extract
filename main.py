@@ -347,7 +347,11 @@ def post_info(username, i, to_download):
 
 
 def posts_info(username, to_download):
-    nimgs = min(user_info(username)["nimgs"], 12)
+    nimgs = user_info(username)
+    if nimgs is None:
+        return
+    nimgs = min(nimgs["nimgs"], 12)
+
     for i in range(nimgs):
         yield post_info(username, i, to_download)
 
@@ -373,6 +377,9 @@ def query_followerings(userid, toget, end_cursor):
 
 
 def followerings_gen(username, toget, end_cursor=""):
+    if not authenticate_user.isLogin():
+        return
+
     userid = user_info(username)["id"]
 
     if userid is None:
