@@ -37,6 +37,8 @@ USERAGENT_INSTA = "Instagram 123.0.0.21.114 (iPhone; CPU iPhone OS 11_4 like Mac
 def urlshortner(url):
     return requests.get("http://tinyurl.com/api-create.php?url=" + url).text
 
+FNAME_SESSION = "usersession"
+
 #==================================================
 
 #AUTHENTICATION
@@ -48,13 +50,14 @@ class User:
     def isLogin(self):
         return False
 
-    def loadCookies(self, fpath):
+    @staticmethod
+    def loadSession(fpath):
         with open(fpath, "rb") as f:
-            self.session.cookies.update(pickle.load(f))
+            return pickle.load(f)
 
-    def saveCookies(self, fpath):
+    def saveSession(self, fpath):
         with open(fpath, "wb") as f:
-            pickle.dump(self.session.cookies, f)
+            pickle.dump(self, f)
 
 
 class AuthenticateUser(User):
@@ -514,7 +517,11 @@ if __name__ == "__main__":
     bannerprint()
 
     authenticate_user = User()
-    if args["login"] is not None:
+
+    if os.path.exists(FNAME_SESSION):
+        authenticate_user = User.loadSession(FNAME_SESSION)
+
+    elif args["login"] is not None:
         authenticate_user = AuthenticateUser()
         authenticate_user.login(*args["login"])
 
@@ -548,3 +555,4 @@ if __name__ == "__main__":
 
     if authenticate_user.isLogin():
         authenticate_user.logout()
+        authenticate_user.saveSession(FNAME_SESSION)
