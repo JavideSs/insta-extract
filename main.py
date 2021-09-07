@@ -11,6 +11,8 @@ URL_LOGIN = URL_BASE+"accounts/login/ajax/"
 URL_LOGOUT = URL_BASE+"accounts/logout/"
 
 URL_USER = URL_BASE+"{username}/?__a=1"
+URL_POST = URL_BASE+"p/{post_shortcode}/?__a=1"
+
 URL_QUERY = URL_BASE+"graphql/query/?query_hash={hash}&variables={params}"
 
 TOGET_FOLLOWERS = {
@@ -22,6 +24,11 @@ TOGET_FOLLOWINGS = {
     "str": "followings",
     "hash": "c56ee0ae1f89cdbd1c89e2bc6b8f3d18",
     "edge_path": "edge_follow"
+}
+TOGET_POSTS = {
+    "str": "posts",
+    "hash": "42323d64886122307be10013ad2dcc44",
+    "edge_path": "edge_owner_to_timeline_media"
 }
 
 USERAGENTS = (
@@ -168,6 +175,14 @@ def listprint(l, title):
 
 #==================================================
 
+#DEBUG FUNCTIONS
+
+def debugjson(text, fname):
+    with open(fname, "w") as fjson:
+        json.dump(text, fjson, indent=4)
+
+#==================================================
+
 #REQUEST
 
 def safe_get(nretry, *args, **kwargs):
@@ -223,9 +238,51 @@ def download_webimg(url):
 
 #==================================================
 
+#QUERY WITH CURSOR
+
+def query_with_cursor(userid, toget, end_cursor):
+    params = '{{"id":"{id}","first":50,"after":"{end}"}}'.format(id=userid, end=end_cursor)
+    response = get_json(URL_QUERY.format(hash=toget["hash"], params=params))
+
+    if response is None:
+        return None, None
+
+    edge = json.loads(response)["data"]["user"][toget["edge_path"]]
+
+    if not edge:
+        return None, None
+
+    nodes = [node["node"] for node in edge["edges"]]
+    end_cursor = edge["page_info"]["end_cursor"]
+    return nodes, end_cursor
+
+
+def query_with_cursor_gen(username, toget, end_cursor=""):
+    if not authenticate_user.isLogin():
+        return
+
+    userid = user_info(username)["id"]
+
+    if userid is None:
+        return
+
+    while True:
+        nodes, end_cursor = query_with_cursor(userid, toget, end_cursor)
+
+        if not nodes:
+            return
+
+        for node in nodes:
+            yield node
+
+        if not end_cursor:
+            return
+
+#==================================================
+
 #GET USER INFO
 
-def user_info(username, to_download=False):
+def get_user_info(username, to_download=False):
     response = get_json(URL_USER.format(username=username))
 
     if response is None:
@@ -282,30 +339,39 @@ def user_info(username, to_download=False):
 
     return info
 
+
+user_info = get_user_info
+
 #==================================================
 
 #GET POST INFO
 
-def post_info(username, i, to_download):
-    if i>12:
-        return
+def get_post_info(node, ipost, to_download, deep=True):
+    #Option deep=True if the search has been made by query by cursor
 
-    response = get_json(URL_USER.format(username=username))
+    if deep:
+        response = get_json(URL_POST.format(post_shortcode=node["shortcode"]))
 
-    if response is None:
-        return
+        if response is None:
+            return
 
-    results = json.loads(response)
-    post_results = results["graphql"]["user"]["edge_owner_to_timeline_media"]["edges"][i]["node"]
+        post_results = json.loads(response)["graphql"]["shortcode_media"]
+
+    else:
+        post_results = node
 
     info = OrderedDict()
-    info["sep"] = "POST INFO "+str(i)
+    info["sep"] = "POST INFO "+str(ipost)
 
     info["timestamp"] = post_results["taken_at_timestamp"]
     info["date"] = datetime.datetime.fromtimestamp(post_results["taken_at_timestamp"])
-    info["nlikes"] = post_results["edge_liked_by"]["count"]
+    info["nlikes"] = post_results["edge_media_preview_like"]["count"]
     info["comments_disabled"] = post_results["comments_disabled"]
-    info["ncomments"] = post_results["edge_media_to_comment"]["count"]
+
+    info["ncomments"] = post_results["edge_media_to_comment"
+        if "edge_media_to_comment" in post_results
+        else "edge_media_to_parent_comment"
+        ]["count"]
 
     location = post_results["location"]
     info["location"] = location["name"]+" (id: "+location["id"]+")" \
@@ -346,62 +412,39 @@ def post_info(username, i, to_download):
     return info
 
 
-def posts_info(username, to_download):
-    nimgs = user_info(username)
-    if nimgs is None:
-        return
-    nimgs = min(nimgs["nimgs"], 12)
+def post_info(username, ipost, to_download):
+    #You have to make a query by cursor if the image is not from the last 12 uploads
 
-    for i in range(nimgs):
-        yield post_info(username, i, to_download)
+    if ipost > 12:
+        for i, node in enumerate(query_with_cursor_gen(username, TOGET_POSTS)):
+            if i == ipost:
+                return get_post_info(node, ipost, to_download)
+
+    else:
+        response = get_json(URL_USER.format(username=username))
+
+        if response is None:
+            return
+
+        results = json.loads(response)
+        node = results["graphql"]["user"]["edge_owner_to_timeline_media"]["edges"][ipost]["node"]
+
+        return get_post_info(node, ipost, to_download, deep=False)
+
+
+def posts_info(username, to_download):
+    for i, node in enumerate(query_with_cursor_gen(username, TOGET_POSTS)):
+        yield get_post_info(node, i, to_download)
 
 #==================================================
 
 #GET FOLLOWERS/FOLLOWINGS USERNAMES
 
-def query_followerings(userid, toget, end_cursor):
-    params = '{{"id":"{id}","first":50,"after":"{end}"}}'.format(id=userid, end=end_cursor)
-    response = get_json(URL_QUERY.format(hash=toget["hash"], params=params))
-
-    if response is None:
-        return None, None
-
-    followings_data = json.loads(response)["data"]["user"][toget["edge_path"]]
-
-    if not followings_data:
-        return None, None
-
-    followings = [node["node"]["username"] for node in followings_data["edges"]]
-    end_cursor = followings_data["page_info"]["end_cursor"]
-    return followings, end_cursor
-
-
-def followerings_gen(username, toget, end_cursor=""):
-    if not authenticate_user.isLogin():
-        return
-
-    userid = user_info(username)["id"]
-
-    if userid is None:
-        return
-
-    while True:
-        followerings, end_cursor = query_followerings(userid, toget, end_cursor)
-
-        if not followerings:
-            return
-
-        for followering in followerings:
-            yield followering
-
-        if not end_cursor:
-            return
-
 def followerings_usernames(username, f, toget):
     with f:
         f.write(username + "|"+toget["str"]+"|" + str(int(time.time())) + "\n")
-        for following in followerings_gen(username, toget):
-            f.write(following + "\n")
+        for node in query_with_cursor_gen(username, toget):
+            f.write(node["username"] + "\n")
             f.flush()
 
 #==================================================
@@ -537,8 +580,7 @@ if __name__ == "__main__":
 
         if args["post"] is not None:
             if args["post"] == -1:
-                posts_info_data = posts_info(args["user"], args["download_posts"])
-                for i, post_info_data in enumerate(posts_info_data):
+                for post_info_data in posts_info(args["user"], args["download_posts"]):
                     dictprint(post_info_data)
             else:
                 post_info_data = post_info(args["user"], args["post"], args["download_posts"])
