@@ -472,8 +472,8 @@ def cmp_usernames(f1, f2):
                     usernames1_notin_2, usernames2_notin_1 \
                         = usernames2_notin_1, usernames1_notin_2
 
-                listprint(usernames1_notin_2, mode1 + " who are no longer")
-                listprint(usernames2_notin_1, mode1 + " who were not longer")
+                listprint(usernames1_notin_2, mode1.upper() + " WHO ARE NO LONGER")
+                listprint(usernames2_notin_1, mode1.upper() + " WHO WERE NOT BEFORE")
                 printsep()
 
             else:
