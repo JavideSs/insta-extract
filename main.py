@@ -6,12 +6,13 @@ import requests
 #CONSTANTS
 
 URL_BASE = "https://www.instagram.com/"
+URL_API = "https://i.instagram.com/api/v1/users/web_profile_info/?"
 
 URL_LOGIN = URL_BASE+"accounts/login/ajax/"
 URL_LOGOUT = URL_BASE+"accounts/logout/"
 
-URL_USER = URL_BASE+"{username}/?__a=1"
-URL_POST = URL_BASE+"p/{post_shortcode}/?__a=1"
+URL_USER = URL_API+"username={username}"
+URL_POST = URL_API+"media_shortcode={post_shortcode}"
 
 URL_QUERY = URL_BASE+"graphql/query/?query_hash={hash}&variables={params}"
 
@@ -32,12 +33,7 @@ TOGET_POSTS = {
 }
 
 USERAGENTS = (
-    "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.99 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.87 Safari/537.36"
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.79 Safari/537.36 Edge/14.14393",
-    "Mozilla/5.0 (Linux; U; Android-4.0.3; en-us; Galaxy Nexus Build/IML74K) AppleWebKit/535.7 (KHTML, like Gecko) CrMo/16.0.912.75 Mobile Safari/535.7",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_1) AppleWebKit/602.2.14 (KHTML, like Gecko) Version/10.0.1 Safari/602.2.14",
-    "Mozilla/5.0 (iPad; CPU OS 8_4_1 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Version/8.0 Mobile/12H321 Safari/600.1.4",
+    "Mozilla/5.0 (Linux; Android 9; GM1903 Build/PKQ1.190110.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/75.0.3770.143 Mobile Safari/537.36 Instagram 103.1.0.15.119 Android (28/9; 420dpi; 1080x2260; OnePlus; GM1903; OnePlus7; qcom; sv_SE; 164094539)",
 )
 USERAGENT_INSTA = "Instagram 123.0.0.21.114 (iPhone; CPU iPhone OS 11_4 like Mac OS X; en_US; en-US; scale=2.00; 750x1334) AppleWebKit/605.1.15"
 
@@ -53,7 +49,9 @@ FNAME_SESSION = "usersession"
 class User:
     def __init__(self):
         self.session = requests.Session()
-
+        self.session.headers.update({
+            "user-agent": random.choice(USERAGENTS)
+        })
     def isLogin(self):
         return False
 
@@ -189,16 +187,15 @@ def safe_get(nretry, *args, **kwargs):
     try:
         response = authenticate_user.session.get(
             timeout=90,
+            *args, **kwargs
+        )   if not authenticate_user.isLogin() \
+        else authenticate_user.session.get(
+            timeout=90,
             cookies=authenticate_user.login_session.cookies,
             *args, **kwargs
-        )   if authenticate_user.isLogin() \
-            else requests.get(*args, **kwargs)
+        )
 
         response.raise_for_status()
-
-        content_length = response.headers.get("Content-Length")
-        if content_length is not None and int(content_length) != len(response.content):
-            raise Exception("Partial response")
 
         return response
 
@@ -289,7 +286,7 @@ def get_user_info(username, to_download=False):
         return
 
     results = json.loads(response)
-    user_results = results["graphql"]["user"]
+    user_results = results["data"]["user"]
 
     info = OrderedDict()
     info["sep"] = "USER INFO"
@@ -427,7 +424,7 @@ def post_info(username, ipost, to_download):
             return
 
         results = json.loads(response)
-        node = results["graphql"]["user"]["edge_owner_to_timeline_media"]["edges"][ipost]["node"]
+        node = results["data"]["user"]["edge_owner_to_timeline_media"]["edges"][ipost]["node"]
 
         return get_post_info(node, ipost, to_download, deep=False)
 
