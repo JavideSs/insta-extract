@@ -78,8 +78,8 @@ Username comparisons should be as the output format of the followings and follow
 ---
 
 ## Dependencies
-It has not been extensively tested yet. The following dependencies have been tested while developing on Windows 10.
-- Python 3.7.4.
+- Python >= 3.6.
+- [Requests](https://requests.readthedocs.io/en/latest/)
 
 ---
 
