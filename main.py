@@ -35,7 +35,6 @@ TOGET_POSTS = {
 USERAGENTS = (
     "Mozilla/5.0 (Linux; Android 9; GM1903 Build/PKQ1.190110.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/75.0.3770.143 Mobile Safari/537.36 Instagram 103.1.0.15.119 Android (28/9; 420dpi; 1080x2260; OnePlus; GM1903; OnePlus7; qcom; sv_SE; 164094539)",
 )
-USERAGENT_INSTA = "Instagram 123.0.0.21.114 (iPhone; CPU iPhone OS 11_4 like Mac OS X; en_US; en-US; scale=2.00; 750x1334) AppleWebKit/605.1.15"
 
 def urlshortner(url):
     return requests.get("http://tinyurl.com/api-create.php?url=" + url).text
@@ -52,6 +51,7 @@ class User:
         self.session.headers.update({
             "user-agent": random.choice(USERAGENTS)
         })
+
     def isLogin(self):
         return False
 
@@ -70,7 +70,6 @@ class AuthenticateUser(User):
         super().__init__()
         self.session.headers = {
             "Referer": URL_BASE,
-            "user-agent": USERAGENT_INSTA
         }
         response = self.session.get(
             URL_BASE
@@ -150,7 +149,7 @@ def dictprint(d):
 
     for k, v in d.items():
         if k.startswith("sep"):
-            print(f"\n{CYAN}[+]{v}{RESET}\n")
+            print(f"\n{CYAN}[+] {v}{RESET}\n")
             continue
         if isinstance(v, (list, tuple, set)):
             v = ", ".join(v)
@@ -185,13 +184,13 @@ def debugjson(text, fname):
 
 def safe_get(nretry, *args, **kwargs):
     try:
-        response = authenticate_user.session.get(
+        response = user.session.get(
             timeout=90,
             *args, **kwargs
-        )   if not authenticate_user.isLogin() \
-        else authenticate_user.session.get(
+        ) if not user.isLogin() \
+        else user.session.get(
             timeout=90,
-            cookies=authenticate_user.login_session.cookies,
+            cookies=user.login_session.cookies,
             *args, **kwargs
         )
 
@@ -255,9 +254,6 @@ def query_with_cursor(userid, toget, end_cursor):
 
 
 def query_with_cursor_gen(username, toget, end_cursor=""):
-    if not authenticate_user.isLogin():
-        return
-
     userid = user_info(username)["id"]
 
     if userid is None:
@@ -384,7 +380,7 @@ def get_post_info(node, ipost, to_download, deep=True):
         else 1
 
     for iimage in range(total_imgs):
-        iimage_str = "("+str(iimage)+")"
+        iimage_str = "("+str(iimage)+") "
 
         post_image_results = post_results["edge_sidecar_to_children"]["edges"][iimage]["node"] \
             if total_imgs != 1 \
@@ -392,11 +388,12 @@ def get_post_info(node, ipost, to_download, deep=True):
 
         info["sep "+str(iimage)] = "IMAGE "+str(iimage)
 
+        info[iimage_str+"id"] = post_image_results["id"]
+
         info[iimage_str+"image_url"] = urlshortner(post_image_results["display_url"])
         if to_download:
             download_webimg(post_image_results["display_url"])
 
-        info[iimage_str+"id"] = post_image_results["id"]
         info[iimage_str+"accessibility"] = post_image_results["accessibility_caption"]
 
         info[iimage_str+"type"] = "video" if post_image_results["is_video"] else "image"
@@ -412,7 +409,7 @@ def get_post_info(node, ipost, to_download, deep=True):
 def post_info(username, ipost, to_download):
     #You have to make a query by cursor if the image is not from the last 12 uploads
 
-    if ipost > 12:
+    if ipost > 11:
         for i, node in enumerate(query_with_cursor_gen(username, TOGET_POSTS)):
             if i == ipost:
                 return get_post_info(node, ipost, to_download)
@@ -430,6 +427,15 @@ def post_info(username, ipost, to_download):
 
 
 def posts_info(username, to_download):
+    if not user.isLogin():
+        i = 0
+        while True:
+            try:
+                yield post_info(username, i, to_download)
+                i+=1
+            except IndexError:
+                return
+
     for i, node in enumerate(query_with_cursor_gen(username, TOGET_POSTS)):
         yield get_post_info(node, i, to_download)
 
@@ -563,42 +569,59 @@ if __name__ == "__main__":
 
     bannerprint()
 
-    authenticate_user = User()
-
     if os.path.exists(FNAME_SESSION):
-        authenticate_user = User.loadSession(FNAME_SESSION)
-
+        user = User.loadSession(FNAME_SESSION)
     elif args["login"] is not None:
-        authenticate_user = AuthenticateUser()
-        authenticate_user.login(*args["login"])
+        user = AuthenticateUser()
+        user.login(*args["login"])
+    else:
+        user = User()
 
     if args["user"] is not None:
+        user_info_data = user_info(args["user"], args["download_posts"])
+
         only_user_info = True
+        for k in ("post", "get_followings", "get_followers"):
+            if args[k] != None:
+                only_user_info = False
+                break
+        if args["info"] or only_user_info:
+            dictprint(user_info_data)
 
         if args["post"] is not None:
-            if args["post"] == -1:
-                for post_info_data in posts_info(args["user"], args["download_posts"]):
-                    dictprint(post_info_data)
+            if user_info_data["private"]:
+                print("Can't get post(s) info ->", "You must follow him")
+
             else:
-                post_info_data = post_info(args["user"], args["post"], args["download_posts"])
-                dictprint(post_info_data)
-            only_user_info = False
+                if args["post"] == -1:
+                    if not user.isLogin():
+                        print("Can't get more than 12 posts ->", "You must be logged in")
+                    for post_info_data in posts_info(args["user"], args["download_posts"]):
+                        dictprint(post_info_data)
+                else:
+                    if args["post"] > 11 and not user.isLogin():
+                        print("Can't get post info ->", "If post index > 11 you must be logged in")
+                    try:
+                        post_info_data = post_info(args["user"], args["post"], args["download_posts"])
+                        dictprint(post_info_data)
+                    except IndexError:
+                        print("Can't get post info ->", "Invalid index")
 
         if args["get_followings"] is not None:
-            followerings_usernames(args["user"], args["get_followings"], TOGET_FOLLOWERS)
-            only_user_info = False
+            if not user.isLogin():
+                print("Can't get followings ->", "You must be logged in")
+            else:
+                followerings_usernames(args["user"], args["get_followings"], TOGET_FOLLOWERS)
 
         if args["get_followers"] is not None:
-            followerings_usernames(args["user"], args["get_followers"], TOGET_FOLLOWINGS)
-            only_user_info = False
-
-        if only_user_info or args["info"]:
-            user_info_data = user_info(args["user"], args["download_posts"])
-            dictprint(user_info_data)
+            if not user.isLogin():
+                print("Can't get followers ->", "You must be logged in")
+            else:
+                followerings_usernames(args["user"], args["get_followers"], TOGET_FOLLOWINGS)
 
     if args["cmp"] is not None:
         cmp_usernames(*args["cmp"])
 
-    if authenticate_user.isLogin():
-        authenticate_user.logout()
-        authenticate_user.saveSession(FNAME_SESSION)
+    if user.isLogin():
+        user.logout()
+        user.saveSession(FNAME_SESSION)

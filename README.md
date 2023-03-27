@@ -1,6 +1,8 @@
 # Insta Extract
 insta-extract is a command line application that scrapes instagram information.
 
+[!] Options that require login not available at the moment.
+
 ---
 
 ## How to use it
@@ -20,21 +22,26 @@ python main.py -h
 
 - **User info:**
 
-``python main.py -l <user> <passw> -u <user_to_scraping>``
+``python main.py -u <user_to_scraping>``
 
 *If any other option has been used and you want to display the user information as well use the -i option:*  
-``python main.py -l <user> <passw> -u <user_to_scraping> -i``
+``python main.py -u <user_to_scraping> -i``
 
 *To download the profile picture use the -dp option:*  
-``python main.py -l <user> <passw> -u <user_to_scraping> -dp``
+``python main.py -u <user_to_scraping> -dp``
+
+- **Login:**
+
+*Required in some options according to [limitations](#limitations):*  
+``python main.py -l <user> <passw>``
 
 - **Posts info:**
 
+*At index counting from the last post as 0:*  
+``python main.py -u <user_to_scraping> -p 1``
+
 *Of all posts:*  
 ``python main.py -l <user> <passw> -u <user_to_scraping> -p``
-
-*At index counting from the last post as 0:*  
-``python main.py -l <user> <passw> -u <user_to_scraping> -p 1``
 
 *To download the posts found use the -dp option:*  
 ``python main.py -l <user> <passw> -u <user_to_scraping> -p -dp``
@@ -59,7 +66,10 @@ Example to know followings not followers and vice versa:
 When you login with the -l option the session is saved in the usersession file, it will be used for the following extractions. So it is not necessary to use the option while the file exists.
 
 ### Limitations
-The instagram api limits unlogged users to only access a finite number of times and not extracting information from privates accounts, also:
+
+If the account is private and you have not logged in or are not following him, you can only get user info.
+
+The instagram api limits unlogged users to:
 - The option of followings and followers will not be available.
 - Post information will have a limit of a range of the last 12 posts.
 
@@ -81,4 +91,4 @@ Your feedback is most welcomed by filling a
 
 Author:  
 Javier Mellado Sánchez  
-2021
+2021, 2023
