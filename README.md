@@ -6,7 +6,6 @@ insta-extract is a command line application that scrapes instagram information.
 ---
 
 ## How to use it
-### Running from source code
 Python must be installed.
 
 ```
@@ -78,8 +77,8 @@ Username comparisons should be as the output format of the followings and follow
 ---
 
 ## Dependencies
-- Python >= 3.6.
-- [Requests](https://requests.readthedocs.io/en/latest/)
+- Python (3.10) >= 3.6.
+- [Requests](https://requests.readthedocs.io/) (2.19.0).
 
 ---
 
