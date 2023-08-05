@@ -16,15 +16,15 @@ URL_POST = URL_API+"media_shortcode={post_shortcode}"
 
 URL_QUERY = URL_BASE+"graphql/query/?query_hash={hash}&variables={params}"
 
-TOGET_FOLLOWERS = {
-    "str": "followers",
-    "hash": "5aefa9893005572d237da5068082d8d5",
-    "edge_path": "edge_followed_by"
-}
 TOGET_FOLLOWINGS = {
     "str": "followings",
     "hash": "c56ee0ae1f89cdbd1c89e2bc6b8f3d18",
     "edge_path": "edge_follow"
+}
+TOGET_FOLLOWERS = {
+    "str": "followers",
+    "hash": "5aefa9893005572d237da5068082d8d5",
+    "edge_path": "edge_followed_by"
 }
 TOGET_POSTS = {
     "str": "posts",
@@ -480,12 +480,12 @@ def cmp_usernames(f1, f2):
                 printsep()
 
             else:
-                if mode2 == "followers":
+                if mode1 == "followers":
                     usernames1_notin_2, usernames2_notin_1 \
                         = usernames2_notin_1, usernames1_notin_2
 
-                listprint(usernames1_notin_2, "FOLLOWERS NOT FOLLOWINGS")
-                listprint(usernames2_notin_1, "FOLLOWINGS NOT FOLLOWERS")
+                listprint(usernames1_notin_2, "FOLLOWINGS NOT FOLLOWERS")
+                listprint(usernames2_notin_1, "FOLLOWERS NOT FOLLOWINGS")
                 printsep()
 
 #==================================================
@@ -611,13 +611,13 @@ if __name__ == "__main__":
             if not user.isLogin():
                 print("Can't get followings ->", "You must be logged in")
             else:
-                followerings_usernames(args["user"], args["get_followings"], TOGET_FOLLOWERS)
+                followerings_usernames(args["user"], args["get_followings"], TOGET_FOLLOWINGS)
 
         if args["get_followers"] is not None:
             if not user.isLogin():
                 print("Can't get followers ->", "You must be logged in")
             else:
-                followerings_usernames(args["user"], args["get_followers"], TOGET_FOLLOWINGS)
+                followerings_usernames(args["user"], args["get_followers"], TOGET_FOLLOWERS)
 
     if args["cmp"] is not None:
         cmp_usernames(*args["cmp"])
