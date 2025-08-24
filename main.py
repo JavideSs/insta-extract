@@ -1,6 +1,6 @@
 import argparse, sys, os
 from collections import OrderedDict, Counter
-import time, datetime, random, pickle, json, re
+import time, datetime, random, json, re
 import requests
 
 #CONSTANTS
@@ -32,79 +32,81 @@ TOGET_POSTS = {
     "edge_path": "edge_owner_to_timeline_media"
 }
 
-USERAGENTS = (
+IG_ID = "936619743392459"
+
+USERAGENTS_APP = (
     "Mozilla/5.0 (Linux; Android 9; GM1903 Build/PKQ1.190110.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/75.0.3770.143 Mobile Safari/537.36 Instagram 103.1.0.15.119 Android (28/9; 420dpi; 1080x2260; OnePlus; GM1903; OnePlus7; qcom; sv_SE; 164094539)",
+)
+USERAGENTS_WEB = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 )
 
 def urlshortner(url):
     return requests.get("http://tinyurl.com/api-create.php?url=" + url).text
 
-FNAME_SESSION = "usersession"
+FNAME_SESSION = "sessionid"
 
 #==================================================
 
 #AUTHENTICATION
 
-class User:
+class UserSession:
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({
-            "user-agent": random.choice(USERAGENTS)
-        })
-
-    def isLogin(self):
-        return False
-
-    @staticmethod
-    def loadSession(fpath):
-        with open(fpath, "rb") as f:
-            return pickle.load(f)
-
-    def saveSession(self, fpath):
-        with open(fpath, "wb") as f:
-            pickle.dump(self, f)
-
-
-class AuthenticateUser(User):
-    def __init__(self):
-        super().__init__()
-        self.session.headers = {
             "Referer": URL_BASE,
-        }
-        response = self.session.get(
+            "X-IG-App-ID": IG_ID,
+            "user-agent": random.choice(USERAGENTS_APP)
+        })
+        self.response = self.session.get(
             URL_BASE
         )
         self.session.headers.update({
-            "X-CSRFToken": response.cookies["csrftoken"]
+            "X-CSRFToken": self.response.cookies["csrftoken"]
         })
 
-        self.login_session = None
-
     def isLogin(self):
-        return self.login_session is not None \
-            and json.loads(self.login_session.text).get("authenticated") \
-            and self.login_session.status_code == 200
+        return self.response.cookies.get("sessionid") is not None
+
+    def load(self, fpath):
+        with open(fpath, "r") as f:
+            sessionid = f.read()
+        self.response.cookies.set("sessionid", sessionid)
+
+    def save(self, fpath):
+        with open(fpath, "w") as f:
+            f.write(self.response.cookies.get("sessionid"))
 
     def login(self, username, password):
-        self.login_session = self.session.post(
+        self.session.headers.update({
+            "user-agent": random.choice(USERAGENTS_WEB)
+        })
+        payload = {
+            "username": username,
+            "enc_password": f"#PWD_INSTAGRAM_BROWSER:0:{int(time.time())}:{password}"
+        }
+        self.response = self.session.post(
             url=URL_LOGIN,
-            data={"username":username, "password":password},
+            data=payload,
+            allow_redirects=True
+        )
+        self.session.headers.update({
+            "user-agent": random.choice(USERAGENTS_APP)
+        })
+
+        if not self.isLogin():
+            print("Error while login:\n", json.loads(self.response.text))
+        return self.response.status_code == 200
+
+    def logout(self):
+        self.response = self.session.post(
+            url=URL_LOGOUT,
             allow_redirects=True
         )
 
         if self.isLogin():
-            self.session.headers.update({
-                "user-agent": random.choice(USERAGENTS)
-            })
-        else:
-            print("Error while login:\n", json.loads(self.login_session.text))
-
-    def logout(self):
-        if self.isLogin():
-            self.session.post(
-                url=URL_LOGOUT,
-                data={"csrfmiddlewaretoken": self.login_session.cookies["csrftoken"]}
-            )
+            print("Error while logout:\n", json.loads(self.response.text))
+        return self.response.status_code == 200
 
 #==================================================
 
@@ -186,11 +188,7 @@ def safe_get(nretry, *args, **kwargs):
     try:
         response = user.session.get(
             timeout=90,
-            *args, **kwargs
-        ) if not user.isLogin() \
-        else user.session.get(
-            timeout=90,
-            cookies=user.login_session.cookies,
+            cookies=user.response.cookies,
             *args, **kwargs
         )
 
@@ -306,9 +304,10 @@ def get_user_info(username, to_download=False):
 
     info["nfollowers"] = user_results["edge_followed_by"]["count"]
     info["nfollowing"] = user_results["edge_follow"]["count"]
-    info["nimgs"] = user_results["edge_owner_to_timeline_media"]["count"]
-    info["nvids"] = user_results["edge_felix_video_timeline"]["count"]
+    info["nposts"] = user_results["edge_owner_to_timeline_media"]["count"]
     info["nreels"] = user_results["highlight_reel_count"]
+
+    info["followed"] = user_results["followed_by_viewer"]
 
     if info["business_account"]:
         info["business_email"] = user_results["business_email"]
@@ -513,6 +512,12 @@ def args_control():
     )
 
     ap.add_argument(
+        "-ld", "--logout",
+        help="Logout current session",
+        action="store_true"
+    )
+
+    ap.add_argument(
         "-i", "--info",
         help="""User profile info,
             option not necessary if no other option is used to extract user info""",
@@ -569,20 +574,19 @@ if __name__ == "__main__":
 
     bannerprint()
 
+    user = UserSession()
     if os.path.exists(FNAME_SESSION):
-        user = User.loadSession(FNAME_SESSION)
+        user.load(FNAME_SESSION)
     elif args["login"] is not None:
-        user = AuthenticateUser()
         user.login(*args["login"])
-    else:
-        user = User()
+    print("Logged in" if user.isLogin() else "Not logged in")
 
     if args["user"] is not None:
-        user_info_data = user_info(args["user"], args["download_posts"])
+        user_info_data = user_info(args["user"], args["download_posts"] and args["post"] is None)
 
         only_user_info = True
         for k in ("post", "get_followings", "get_followers"):
-            if args[k] != None:
+            if args[k] is not None:
                 only_user_info = False
                 break
         if args["info"] or only_user_info:
@@ -623,5 +627,11 @@ if __name__ == "__main__":
         cmp_usernames(*args["cmp"])
 
     if user.isLogin():
-        user.logout()
-        user.saveSession(FNAME_SESSION)
+        if not args["logout"]:
+            if not os.path.exists(FNAME_SESSION):
+                user.save(FNAME_SESSION)
+        else:
+            user.logout()
+            print("Logged out" if not user.isLogin() else "Error while logout")
+            if not user.isLogin() and os.path.exists(FNAME_SESSION):
+                os.remove(FNAME_SESSION)

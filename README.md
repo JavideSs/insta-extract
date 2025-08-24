@@ -1,7 +1,7 @@
 # Insta Extract
 insta-extract is a command line application that scrapes instagram information.
 
-[!] Options that require login not available at the moment.
+[!] Instagram sometimes updates how its data is accessed, this script may be outdated.
 
 ---
 
@@ -34,6 +34,9 @@ python main.py -h
 *Required in some options according to [limitations](#limitations):*  
 ``python main.py -l <user> <passw>``
 
+*Logout:*  
+``python main.py -ld``
+
 - **Posts info:**
 
 *At index counting from the last post as 0:*  
@@ -60,7 +63,7 @@ python main.py -h
 ### Additional
 Multiple options can be specified at the same time.  
 Example to know followings not followers and vice versa:  
-``python main.py -l <user> <passw> -u <user_to_scraping> -f1 <file1.txt> -f2 <file2.txt> -c <file1.txt> <file2.txt>``
+``python main.py -l <user> <passw> -ld -u <user_to_scraping> -f1 <file1.txt> -f2 <file2.txt> -c <file1.txt> <file2.txt>``
 
 When you login with the -l option the session is saved in the usersession file, it will be used for the following extractions. So it is not necessary to use the option while the file exists.
 
@@ -72,13 +75,15 @@ The instagram api limits unlogged users to:
 - The option of followings and followers will not be available.
 - Post information will have a limit of a range of the last 12 posts.
 
+Instagram blocks this script after many requests, be careful.
+
 Username comparisons should be as the output format of the followings and followers options.
 
 ---
 
 ## Dependencies
 - Python (3.10) >= 3.6.
-- [Requests](https://requests.readthedocs.io/) (2.19.0).
+- [Requests](https://requests.readthedocs.io/) (2.32.3).
 
 ---
 
@@ -90,4 +95,4 @@ Your feedback is most welcomed by filling a
 
 Author:  
 Javier Mellado Sánchez  
-2021, 2023
+2021, 2023, 2025
